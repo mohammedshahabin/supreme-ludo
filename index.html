@@ -1,0 +1,728 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SUPER LUDO - Final</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;background:#202124;color:#fff;font-family:Arial,sans-serif;
+  text-align:center
+}
+h1{margin:12px 0 8px;font-size:clamp(25px,6vw,38px)}
+.controls{display:flex;justify-content:center;gap:10px;flex-wrap:wrap}
+button{
+  padding:12px 24px;background:#ff9f1c;color:#fff;border:0;border-radius:12px;
+  font-size:17px;font-weight:800;cursor:pointer
+}
+button:disabled{opacity:.45;cursor:not-allowed}
+#dice,#msg{font-size:18px;margin:7px}
+#msg{font-weight:800;min-height:23px}
+#status{max-width:760px;margin:4px auto 8px;font-size:14px;color:#ddd}
+
+/* =========================================================
+   REAL 15 x 15 LUDO BOARD
+   ========================================================= */
+.board{
+  position:relative;
+  width:min(760px,94vw);
+  aspect-ratio:1;
+  margin:8px auto;
+  background:#fff;
+  border:6px solid #111;
+  display:grid;
+  grid-template-columns:repeat(15,1fr);
+  grid-template-rows:repeat(15,1fr);
+  overflow:hidden;
+}
+
+.cell{
+  border:1px solid #aaa;
+  background:#fff;
+  position:relative;
+  z-index:1;
+}
+
+/* The four coloured finishing lanes */
+.redLane{background:#ef2525}
+.greenLane{background:#16a34a}
+.blueLane{background:#2864e8}
+.yellowLane{background:#facc15}
+
+/* Starting squares are clearly marked */
+.start-red{background:#ff3b3b!important}
+.start-green{background:#22c55e!important}
+.start-blue{background:#3b82f6!important}
+.start-yellow{background:#ffd21c!important}
+
+/* Safe/star squares */
+.safeSquare:after{
+  content:"★";
+  position:absolute;
+  left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  font-size:clamp(11px,2vw,18px);
+  color:#555;
+}
+
+/* Four large home areas */
+.home{
+  position:absolute;width:40%;height:40%;
+  display:flex;align-items:center;justify-content:center;
+  z-index:8;border:2px solid #111;
+}
+.redhome{left:0;top:0;background:#ef2525}
+.greenhome{right:0;top:0;background:#16a34a}
+.bluehome{left:0;bottom:0;background:#2864e8}
+.yellowhome{right:0;bottom:0;background:#facc15}
+
+.box{
+  width:68%;height:68%;background:#fff;border:3px solid #111;
+  display:grid;grid-template-columns:1fr 1fr;
+  grid-template-rows:1fr 1fr;
+  place-items:center;padding:8%;gap:8%;
+}
+
+/* =========================================================
+   CENTER: four triangles point toward the correct lanes
+   Red = left, Green = top, Yellow = right, Blue = bottom
+   ========================================================= */
+.center{
+  position:absolute;
+  left:40%;top:40%;
+  width:20%;height:20%;
+  z-index:12;
+  border:2px solid #111;
+  background:#fff;
+  overflow:hidden;
+}
+.centerPart{
+  position:absolute;inset:0;
+}
+.centerRed{
+  background:#ef2525;
+  clip-path:polygon(0 0,50% 50%,0 100%);
+}
+.centerGreen{
+  background:#16a34a;
+  clip-path:polygon(0 0,100% 0,50% 50%);
+}
+.centerYellow{
+  background:#facc15;
+  clip-path:polygon(100% 0,100% 100%,50% 50%);
+}
+.centerBlue{
+  background:#2864e8;
+  clip-path:polygon(0 100%,100% 100%,50% 50%);
+}
+.centerStar{
+  position:absolute;left:50%;top:50%;
+  transform:translate(-50%,-50%);
+  z-index:20;font-size:clamp(20px,5vw,40px);
+  text-shadow:0 2px 3px #555;
+}
+
+/* =========================================================
+   TOKENS
+   ========================================================= */
+.token{
+  width:clamp(25px,5.2vw,42px);
+  height:clamp(25px,5.2vw,42px);
+  border-radius:50%;
+  border:4px solid #111;
+  box-shadow:0 3px 7px #555;
+  cursor:pointer;
+  transition:transform .16s,box-shadow .16s;
+  position:relative;
+  z-index:30;
+  display:block;
+}
+.token:hover{transform:scale(1.1)}
+.red{background:#ff3b3b}
+.green{background:#22c55e}
+.blue{background:#3b82f6}
+.yellow{background:#ffd21c}
+
+.selectable{
+  animation:pulse .65s infinite alternate;
+}
+@keyframes pulse{
+  to{
+    transform:scale(1.15);
+    box-shadow:0 0 0 4px #fff,0 0 18px #ff9f1c;
+  }
+}
+
+.movingToken{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  margin:0;
+}
+.movingToken:hover{
+  transform:translate(-50%,-50%) scale(1.1);
+}
+
+.finishToken{
+  position:absolute;
+  transform:translate(-50%,-50%);
+  margin:0;
+  z-index:35;
+}
+
+.legend{
+  display:flex;justify-content:center;gap:14px;flex-wrap:wrap;
+  font-size:13px;margin:6px 0 12px
+}
+.dot{
+  display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:4px
+}
+</style>
+</head>
+
+<body>
+<h1>🎲 SUPER LUDO 🎲</h1>
+
+<div class="controls">
+  <button id="rollBtn" onclick="rollDice()">ROLL DICE</button>
+  <button onclick="newGame()">NEW GAME</button>
+</div>
+
+<div id="dice">🎲</div>
+<div id="msg">Red's Turn — Roll the dice</div>
+<div id="status">Roll a 6 to bring a token out. Click a highlighted token to move it.</div>
+
+<div class="board" id="board">
+
+  <!-- Four home areas -->
+  <div class="home redhome"><div class="box" id="redBox"></div></div>
+  <div class="home greenhome"><div class="box" id="greenBox"></div></div>
+  <div class="home bluehome"><div class="box" id="blueBox"></div></div>
+  <div class="home yellowhome"><div class="box" id="yellowBox"></div></div>
+
+  <!-- Correct four-colour center -->
+  <div class="center">
+    <div class="centerPart centerRed"></div>
+    <div class="centerPart centerGreen"></div>
+    <div class="centerPart centerYellow"></div>
+    <div class="centerPart centerBlue"></div>
+    <div class="centerStar">⭐</div>
+  </div>
+</div>
+
+<div class="legend">
+  <span><span class="dot" style="background:#ef2525"></span>Red</span>
+  <span><span class="dot" style="background:#22c55e"></span>Green</span>
+  <span><span class="dot" style="background:#3b82f6"></span>Blue</span>
+  <span><span class="dot" style="background:#ffd21c"></span>Yellow</span>
+</div>
+
+<script>
+/* =========================================================
+   SUPER LUDO - FINAL GAME ENGINE
+   Everything is contained in this single HTML file.
+   ========================================================= */
+
+const colors=["red","green","blue","yellow"];
+const names={red:"Red",green:"Green",blue:"Blue",yellow:"Yellow"};
+
+/*
+  Exact 52-square outer path of a standard 15x15 Ludo board.
+  Coordinates are [row,column].
+*/
+const PATH=[
+  [6,0],[6,1],[6,2],[6,3],[6,4],[6,5],
+  [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
+  [0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],
+  [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],
+  [7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],
+  [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],
+  [14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],
+  [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0]
+];
+
+/*
+  Correct starting squares:
+  Red   = left
+  Green = top
+  Yellow= right
+  Blue  = bottom
+*/
+const START={
+  red:1,      // [6,1]
+  green:14,   // [1,8]
+  yellow:27,  // [8,13]
+  blue:40     // [13,6]
+};
+
+/*
+  Finishing lanes are ordered from the outside toward the center.
+  This is important: each coloured line now ends in its matching
+  coloured section of the center.
+*/
+const HOME_LANES={
+  red:[
+    [7,1],[7,2],[7,3],[7,4],[7,5]
+  ],
+  green:[
+    [5,7],[4,7],[3,7],[2,7],[1,7]
+  ],
+  yellow:[
+    [7,13],[7,12],[7,11],[7,10],[7,9]
+  ],
+  blue:[
+    [9,7],[10,7],[11,7],[12,7],[13,7]
+  ]
+};
+
+/* Standard safe squares. */
+const SAFE=new Set([1,8,14,21,27,34,40,47]);
+
+let players,turn,dice,rolled,gameOver,tokenId;
+
+/* ---------------------------------------------------------
+   GAME SETUP
+   --------------------------------------------------------- */
+function makePlayers(){
+  const p={};
+
+  colors.forEach(c=>{
+    p[c]=Array.from({length:4},()=>({
+      id:tokenId++,
+      color:c,
+      steps:-1,       // -1 = yard
+                       // 0..50 = outer path
+                       // 51..55 = coloured lane
+                       // 56 = finished
+      finished:false
+    }));
+  });
+
+  return p;
+}
+
+function newGame(){
+  tokenId=0;
+  players=makePlayers();
+
+  turn=0;
+  dice=null;
+  rolled=false;
+  gameOver=false;
+
+  document.getElementById("rollBtn").disabled=false;
+  document.getElementById("dice").textContent="🎲";
+  document.getElementById("msg").textContent="Red's Turn — Roll the dice";
+  document.getElementById("status").textContent=
+    "Roll a 6 to bring a token out. Click a highlighted token to move it.";
+
+  buildBoard();
+  render();
+}
+
+/* ---------------------------------------------------------
+   BUILD THE BOARD
+   --------------------------------------------------------- */
+function buildBoard(){
+  const board=document.getElementById("board");
+
+  board.querySelectorAll(".gridCell").forEach(e=>e.remove());
+
+  for(let r=0;r<15;r++){
+    for(let c=0;c<15;c++){
+
+      const el=document.createElement("div");
+      el.className="cell gridCell";
+      el.style.gridRow=(r+1);
+      el.style.gridColumn=(c+1);
+
+      /* Outer path */
+      const index=PATH.findIndex(p=>p[0]===r && p[1]===c);
+
+      if(index>=0){
+        el.dataset.path=index;
+      }
+
+      /* Correct coloured finishing lanes */
+      if(HOME_LANES.red.some(p=>p[0]===r&&p[1]===c))
+        el.classList.add("redLane");
+
+      if(HOME_LANES.green.some(p=>p[0]===r&&p[1]===c))
+        el.classList.add("greenLane");
+
+      if(HOME_LANES.yellow.some(p=>p[0]===r&&p[1]===c))
+        el.classList.add("yellowLane");
+
+      if(HOME_LANES.blue.some(p=>p[0]===r&&p[1]===c))
+        el.classList.add("blueLane");
+
+      /* Correct coloured starting squares */
+      if(r===6&&c===1)el.classList.add("start-red");
+      if(r===1&&c===8)el.classList.add("start-green");
+      if(r===8&&c===13)el.classList.add("start-yellow");
+      if(r===13&&c===6)el.classList.add("start-blue");
+
+      /* Safe squares */
+      if(SAFE.has(index))el.classList.add("safeSquare");
+
+      board.prepend(el);
+    }
+  }
+}
+
+/* ---------------------------------------------------------
+   POSITION / MOVEMENT
+   --------------------------------------------------------- */
+function currentColor(){
+  return colors[turn];
+}
+
+/*
+  Convert a token's outer-path progress into its real path square.
+  Once it enters a coloured lane it is no longer on the shared path.
+*/
+function globalPos(t){
+  if(t.steps<0 || t.steps>50)return null;
+  return (START[t.color]+t.steps)%52;
+}
+
+function canMove(t,n){
+  if(t.finished)return false;
+
+  /* A token leaves its yard only with a 6. */
+  if(t.steps===-1)return n===6;
+
+  /* 56 is the final center position. */
+  return t.steps+n<=56;
+}
+
+function movableTokens(){
+  return players[currentColor()].filter(t=>canMove(t,dice));
+}
+
+/* ---------------------------------------------------------
+   DICE
+   --------------------------------------------------------- */
+function rollDice(){
+  if(gameOver || rolled)return;
+
+  dice=Math.floor(Math.random()*6)+1;
+  rolled=true;
+
+  document.getElementById("dice").textContent="🎲 "+dice;
+
+  const moves=movableTokens();
+
+  if(moves.length===0){
+
+    document.getElementById("msg").textContent=
+      `${names[currentColor()]} rolled ${dice} — no legal move.`;
+
+    clearHighlights();
+
+    setTimeout(()=>{
+      if(gameOver)return;
+
+      if(dice===6){
+        rolled=false;
+        document.getElementById("msg").textContent=
+          `${names[currentColor()]} gets another roll!`;
+        document.getElementById("status").textContent=
+          "Roll the dice again.";
+      }else{
+        nextTurn();
+      }
+    },650);
+
+  }else{
+
+    document.getElementById("msg").textContent=
+      `${names[currentColor()]} rolled ${dice} — choose a token.`;
+
+    document.getElementById("status").textContent=
+      "Highlighted tokens can move.";
+
+    highlightMoves();
+  }
+
+  render();
+}
+
+/* ---------------------------------------------------------
+   MOVE
+   --------------------------------------------------------- */
+function moveToken(id){
+  if(!rolled || gameOver)return;
+
+  const c=currentColor();
+  const t=players[c].find(x=>x.id===id);
+
+  if(!t || !canMove(t,dice))return;
+
+  /* Yard -> exact starting square */
+  if(t.steps===-1){
+    t.steps=0;
+  }else{
+    t.steps+=dice;
+  }
+
+  let captured=0;
+  const landed=globalPos(t);
+
+  /* Capture opponents on non-safe outer squares. */
+  if(landed!==null && !SAFE.has(landed)){
+
+    colors.filter(x=>x!==c).forEach(oc=>{
+      players[oc].forEach(enemy=>{
+
+        if(enemy.finished || enemy.steps<0)return;
+
+        if(globalPos(enemy)===landed){
+          enemy.steps=-1;
+          captured++;
+        }
+      });
+    });
+  }
+
+  /* Exact 56 means the token is finished. */
+  if(t.steps===56)t.finished=true;
+
+  render();
+  clearHighlights();
+
+  /* WIN */
+  if(players[c].every(x=>x.finished)){
+
+    gameOver=true;
+    document.getElementById("rollBtn").disabled=true;
+
+    document.getElementById("msg").textContent=
+      `🏆 ${names[c]} WINS THE GAME! 🏆`;
+
+    document.getElementById("status").textContent=
+      "All four tokens reached the center. Press NEW GAME to play again.";
+
+    return;
+  }
+
+  /* 6 or capture = extra roll */
+  const extra=(dice===6 || captured>0);
+
+  if(extra){
+
+    rolled=false;
+
+    document.getElementById("msg").textContent=
+      captured
+      ? `${names[c]} captured a token! Extra roll!`
+      : `${names[c]} moved. Extra roll!`;
+
+    document.getElementById("status").textContent=
+      "Roll the dice again.";
+
+  }else{
+    nextTurn();
+  }
+}
+
+/* ---------------------------------------------------------
+   TURN
+   --------------------------------------------------------- */
+function nextTurn(){
+
+  rolled=false;
+  dice=null;
+  turn=(turn+1)%4;
+
+  const c=currentColor();
+
+  document.getElementById("msg").textContent=
+    `${names[c]}'s Turn — Roll the dice`;
+
+  document.getElementById("status").textContent=
+    "Roll a 6 to bring a token out. Click a highlighted token to move it.";
+
+  render();
+}
+
+/* ---------------------------------------------------------
+   HIGHLIGHT
+   --------------------------------------------------------- */
+function highlightMoves(){
+
+  clearHighlights();
+
+  movableTokens().forEach(t=>{
+
+    const el=document.querySelector(
+      `[data-token-id="${t.id}"]`
+    );
+
+    if(el)el.classList.add("selectable");
+  });
+}
+
+function clearHighlights(){
+
+  document.querySelectorAll(".selectable")
+    .forEach(e=>e.classList.remove("selectable"));
+}
+
+/* ---------------------------------------------------------
+   TOKEN RENDERING
+   --------------------------------------------------------- */
+function tokenHTML(t){
+  return `<i class="token ${t.color}"
+    data-token-id="${t.id}"
+    title="${names[t.color]} token"></i>`;
+}
+
+/*
+  Put a moving token at the CENTER of a real 15x15 square.
+*/
+function placeMovingToken(el,row,col,offsetX=0,offsetY=0){
+
+  el.style.left=
+    `calc(${((col+0.5)/15)*100}% + ${offsetX}px)`;
+
+  el.style.top=
+    `calc(${((row+0.5)/15)*100}% + ${offsetY}px)`;
+}
+
+/* Small offsets make multiple tokens on one square visible. */
+function stackOffset(index,total){
+
+  if(total<=1)return [0,0];
+
+  const offsets=[
+    [-10,-10],[10,-10],[-10,10],[10,10]
+  ];
+
+  return offsets[index%4] || [0,0];
+}
+
+function render(){
+
+  /* Tokens still in the yards */
+  colors.forEach(c=>{
+
+    const box=document.getElementById(c+"Box");
+    box.innerHTML="";
+
+    players[c]
+      .filter(t=>t.steps<0)
+      .forEach(t=>{
+
+        const wrap=document.createElement("div");
+        wrap.innerHTML=tokenHTML(t);
+
+        const el=wrap.firstChild;
+
+        el.onclick=()=>moveToken(t.id);
+
+        box.appendChild(el);
+      });
+  });
+
+  /* Remove old moving/finished tokens */
+  document.querySelectorAll(".movingToken,.finishToken")
+    .forEach(e=>e.remove());
+
+  /* Group moving tokens by board square for clean stacking */
+  const occupied={};
+
+  colors.forEach(c=>{
+
+    players[c]
+      .filter(t=>t.steps>=0 && !t.finished)
+      .forEach(t=>{
+
+        let row,col;
+
+        /* Shared outer track */
+        if(t.steps<=50){
+
+          const pos=PATH[(START[c]+t.steps)%52];
+          row=pos[0];
+          col=pos[1];
+
+        }else{
+
+          /* Correct coloured finishing lane */
+          const laneIndex=t.steps-51;
+          const lane=HOME_LANES[c][laneIndex];
+
+          row=lane[0];
+          col=lane[1];
+        }
+
+        const key=row+","+col;
+
+        if(!occupied[key])occupied[key]=[];
+        const index=occupied[key].length;
+        const total=0; // offset recalculated below
+        occupied[key].push({t,row,col,index});
+      });
+  });
+
+  Object.values(occupied).forEach(list=>{
+
+    list.forEach(item=>{
+
+      const el=document.createElement("i");
+
+      el.className=`token ${item.t.color} movingToken`;
+      el.dataset.tokenId=item.t.id;
+      el.onclick=()=>moveToken(item.t.id);
+
+      const [ox,oy]=stackOffset(item.index,list.length);
+
+      placeMovingToken(
+        el,
+        item.row,
+        item.col,
+        ox,
+        oy
+      );
+
+      document.getElementById("board").appendChild(el);
+    });
+  });
+
+  /* Finished tokens are shown in the exact center. */
+  const finished=[];
+
+  colors.forEach(c=>{
+    players[c]
+      .filter(t=>t.finished)
+      .forEach(t=>finished.push(t));
+  });
+
+  finished.forEach((t,i)=>{
+
+    const el=document.createElement("i");
+
+    el.className=`token ${t.color} finishToken`;
+    el.dataset.tokenId=t.id;
+
+    const spots=[
+      [-18,-18],[18,-18],[-18,18],[18,18]
+    ];
+
+    const p=spots[i%4];
+
+    el.style.left=`calc(50% + ${p[0]}px)`;
+    el.style.top=`calc(50% + ${p[1]}px)`;
+
+    document.getElementById("board").appendChild(el);
+  });
+
+  if(rolled)highlightMoves();
+}
+
+/* Start immediately. */
+newGame();
+</script>
+</body>
+</html>
